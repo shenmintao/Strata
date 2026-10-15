@@ -1,0 +1,35 @@
+name: strata
+services:
+  strata:
+    image: strata-nas:gfx1200
+    container_name: strata
+    build:
+      context: ./source
+      dockerfile: Dockerfile.hip
+      args:
+        HIP_ARCH: gfx1200
+        BUILD_JOBS: "4"
+        SOURCE_REVISION: ${SOURCE_REVISION:?Set SOURCE_REVISION in .env}
+    restart: unless-stopped
+    ports:
+      - "${STRATA_LAN_ADDRESS:?Set the LAN address to publish on in .env}:8081:8080"
+    environment:
+      STRATA_API_KEY: ${STRATA_API_KEY:?Set a private API key in .env}
+      PYTHONUNBUFFERED: "1"
+    devices:
+      - /dev/kfd:/dev/kfd
+      - ${AMD_RENDER_DEVICE:?Resolve the AMD render node first}:/dev/dri/renderD129
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+    shm_size: 1gb
+    mem_limit: 46g
+    memswap_limit: 46g
+    pids_limit: 512
+    volumes:
+      - ./data:/data:ro
+      - ./config:/config:ro
+      - ./logs:/logs
+      - ./state:/state
+    logging:
+      driver: json-file
+      options: {max-size: 20m, max-file: "3"}
