@@ -1,0 +1,39 @@
+{
+  "exe": "/opt/strata/build-hip/strata",
+  "cwd": "/opt/strata",
+  "backend": "hip",
+  "hip_ordinal": 0,
+  "model_name": "qwen3.8-flash-next-iq3_s",
+  "aliases": ["qwen3.8-flash-next", "strata"],
+  "tokenizer": "/data/packs/iq3_s/tokenizer",
+  "log": "/logs/engine.log",
+  "open_browser": false,
+  "allowed_hosts": ["LAN_ADDRESS"],
+  "fit_max_tokens": true,
+  "slot_save_path": "/state/slots",
+  "min_free_vram_mib": 256,
+  "args": [
+    "--pack", "/data/packs/iq3_s",
+    "--native", "/data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+    "--ple-gguf", "/data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
+    "--expert-profile", "/opt/strata/data/expert-profile.bin",
+    "--expert-cache", "auto",
+    "--prefill", "8192",
+    "--spec", "4",
+    "--spec-min-p", "0.5",
+    "--mtp", "/data/mtp/rt",
+    "--max-context", "65536",
+    "--kv", "int8",
+    "--kv-resident", "32768",
+    "--resident-experts",
+    "--pool-workers", "6",
+    "--vram-reserve-mib", "512",
+    "--expert-profile-save", "/state/expert-profile.bin",
+    "--expert-profile-save-every", "10"
+  ],
+  "env": {
+    "STRATA_HIPBLASLT_TUNING": "/opt/strata/tools/hip/gfx1200-hipblaslt-100202.txt",
+    "STRATA_HC_Q8": "1",
+    "STRATA_RESIDENT_HEADROOM_GIB": "6"
+  }
+}
