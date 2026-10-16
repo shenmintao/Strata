@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -343,12 +344,18 @@ public:
         for (size_t i = 0; i < entries_.size(); ++i) {
             if (entries_[i].pinned() || (guarded_ != 0 && serials_[i] == guarded_)) continue;
             bytes_ -= entries_[i].bytes();
+            SavedConversation gone = std::move(entries_[i]);
             erase(i);
             ++evictions_;
+            if (on_evict) on_evict(std::move(gone));   // the disk tier (conversation_disk.hpp) may keep it
             return true;
         }
         return false;
     }
+
+    // Called with each conversation evict_oldest() removes (not with clear()'s): --conversation-disk-dir writes the long
+    // ones to disk.  Empty: an evicted conversation is dropped, as before.
+    std::function<void(SavedConversation&&)> on_evict;
 
     // #879: every parked conversation (pinned ones too) and the retained K/V go - after non-finite logits any of them
     // may carry the poison.  Returns how many were parked.
