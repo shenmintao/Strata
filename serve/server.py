@@ -2555,6 +2555,7 @@ class Vision:
         # first picture and stops after elastic_idle_s without one; while it runs, the engine's expert cache keeps
         # elastic_mib of VRAM free for it (Service._vision_up / _vision_idle_down)
         self.elastic = cfg.get("elastic") is True
+        self.gpu = bool(cfg.get("gpu"))                 # a CPU encoder's elastic mode only starts and stops the process
         self.elastic_mib = int(cfg.get("elastic_mib") or 2048)
         self.elastic_idle_s = float(cfg.get("elastic_idle_s") or 120)
         if not lazy and not self.elastic:
@@ -4014,7 +4015,7 @@ class Service:
         v = self.vision
         if not getattr(v, "elastic", False) or v.alive():
             return
-        if hasattr(self.engine, "vram") and self.loaded():
+        if getattr(v, "gpu", True) and hasattr(self.engine, "vram") and self.loaded():
             try:
                 out = self.engine.vram((self._engine_reserve() or 0) + v.elastic_mib)
                 self.vision_held = True
@@ -4049,6 +4050,9 @@ class Service:
                 print(f"[strata] images: the image encoder stopped after {v.elastic_idle_s:g} s without a picture; "
                       f"the expert cache took its VRAM back ({out.get('expert_cache_mib')} of "
                       f"{out.get('expert_cache_full_mib')} MiB)", flush=True)
+            elif not self.vision_held:
+                print(f"[strata] images: the image encoder stopped after {v.elastic_idle_s:g} s without a picture "
+                      "(its RAM goes back; the next picture starts it again)", flush=True)
             self.vision_held = False
             return "down"
         finally:
@@ -4059,7 +4063,8 @@ class Service:
         if not getattr(v, "elastic", False):
             return
         print(f"[strata] images: the image encoder starts with the first picture and stops after {v.elastic_idle_s:g} s "
-              f"without one; while it runs the expert cache keeps {v.elastic_mib} MiB free for it", flush=True)
+              f"without one" + (f"; while it runs the expert cache keeps {v.elastic_mib} MiB free for it"
+                                 if getattr(v, "gpu", True) else " (on the CPU: its RAM goes back)"), flush=True)
 
         def loop():
             while True:
@@ -8151,7 +8156,9 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
         for line in card_roles_lines(cfg):             # the card roles: said first; every card Off stops here, before anything touches a card
             print(line, flush=True)
         if cfg.get("vision"):
-            elastic = cfg["vision"].get("elastic") is True and cfg.get("vram_elastic") is True
+            # a CPU encoder ("gpu": false) needs no VRAM from the cache: its elastic mode only saves the process' RAM
+            elastic = cfg["vision"].get("elastic") is True and (cfg.get("vram_elastic") is True or
+                                                                 not cfg["vision"].get("gpu"))
             print("the vision encoder starts with the first picture (elastic) ..." if elastic else
                   "loading the vision encoder ..." if not lazy else
                   "vision encoder unloaded; it starts with the model ...", flush=True)
@@ -8161,7 +8168,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
                     for k, v in cfg["vision"].items() if not (k == "exe" and engine_component.is_reference(v))}
             if engine_component.is_reference(cfg["vision"].get("exe")):     # the engine from the component folder
                 vcfg["exe"] = _component_exe(cfg["vision"]["exe"], cfg)
-            if vcfg.get("elastic") is True and cfg.get("vram_elastic") is not True:
+            if vcfg.get("elastic") is True and cfg.get("vram_elastic") is not True and vcfg.get("gpu"):
                 print('[strata] the vision section\'s "elastic" needs "vram_elastic": true (the expert cache gives the '
                       "encoder its VRAM): the encoder starts with the model instead", flush=True)
                 vcfg["elastic"] = False
