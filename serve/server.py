@@ -6460,6 +6460,18 @@ def make_handler(svc: Service):
                     model = {"id": svc.model, "object": "model", "owned_by": "strata", "status": {"value": "loaded"},
                              "meta": {"n_ctx": ctx}, "context_length": ctx, "max_model_len": ctx,
                              "max_context_length": ctx, "context_window": ctx,
+                             # the thinking levels the model's template knows (reasoning_effort; "none" turns thinking
+                             # off and "high" means xhigh), under the field names model pickers read
+                             "reasoning": True, "supported_reasoning_efforts": ["low", "medium", "xhigh"],
+                             "default_reasoning_effort": svc.effort_default() or "xhigh",
+                             "supported_reasoning_levels": [{"effort": e, "description": d} for e, d in (
+                                 ("low", "brief thinking"), ("medium", "as much as the task needs"),
+                                 ("xhigh", "careful, checks its assumptions (the model's default)"))],
+                             "default_reasoning_level": svc.effort_default() or "xhigh",
+                             "supported_parameters": ["max_tokens", "temperature", "top_p", "top_k", "stop", "seed",
+                                                      "tools", "tool_choice", "reasoning", "reasoning_effort",
+                                                      "include_reasoning", "response_format"],
+                             "capabilities": {"reasoning": True, "tool_calling": True, "vision": svc.vision is not None},
                              "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                               "output_modalities": ["text"]}}
                     if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
