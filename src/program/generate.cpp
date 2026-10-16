@@ -12601,6 +12601,7 @@ int main(int argc, char** argv) {
             }
             const auto parked = conversations.best(ids, req_imgs, want_cvec);
             std::optional<strata::core::SavedConversation> incoming;
+            auto taken = parked;   // the match `incoming` is restored at: RAM's, or the disk tier's below
             // the disk tier, when one of its conversations continues this prompt further than anything in RAM
             if (disk_ok && stages.empty()) {
                 const auto on_disk = disk.best(ids, req_imgs, want_cvec);
@@ -12635,6 +12636,7 @@ int main(int argc, char** argv) {
                                                  "%zu MiB in %.0f ms\n", image.live.ids.size(), (long long) on_disk.tokens,
                                          bytes >> 20, std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
                             incoming.emplace(std::move(image));
+                            taken = on_disk;
                         }
                     } catch (const std::bad_alloc&) {
                         std::fprintf(stderr, "strata serve: conversation disk: not read (out of memory)\n");
@@ -12864,8 +12866,8 @@ int main(int argc, char** argv) {
                     if (!strata::core::conversation_checkpoints_merge(std::move(cs), checks)) checks.clear();
                 }
                 cvec_cached = incoming->cvec;
-                resume = parked.tokens;
-                from_live = parked.live;
+                resume = taken.tokens;
+                from_live = taken.live;
                 if (std::getenv("STRATA_SNAPSHOT_FULL_CAPTURE") == nullptr) {
                     std::vector<std::vector<strata::core::ConversationKv>> stage_kv;   // every stage's, for its next park
                     for (auto& si : incoming->stage_images) stage_kv.push_back(std::move(si.kv));
