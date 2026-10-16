@@ -6454,8 +6454,12 @@ def make_handler(svc: Service):
             elif path in ("/v1/models", "/models"):
                 if self._authorized():
                     loaded = svc.loaded()
-                    model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
-                             "meta": {"n_ctx": svc.reported_ctx()},
+                    ctx = svc.reported_ctx()
+                    # the context length under the names other clients read: OpenRouter / many UIs (context_length),
+                    # vLLM (max_model_len), LM Studio (max_context_length); llama.cpp's meta.n_ctx stays
+                    model = {"id": svc.model, "object": "model", "owned_by": "strata", "status": {"value": "loaded"},
+                             "meta": {"n_ctx": ctx}, "context_length": ctx, "max_model_len": ctx,
+                             "max_context_length": ctx, "context_window": ctx,
                              "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                               "output_modalities": ["text"]}}
                     if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
