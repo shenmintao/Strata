@@ -12,8 +12,8 @@ COPY . .
 RUN python3 -m venv .venv \
     && if test -d vendor/wheelhouse; then \
          (cd vendor && sha256sum -c SHA256SUMS) \
-         && .venv/bin/pip install --no-cache-dir --no-index --find-links=vendor/wheelhouse -r requirements.txt; \
-       else .venv/bin/pip install --no-cache-dir -r requirements.txt; fi
+         && .venv/bin/pip install --no-cache-dir --no-index --find-links=vendor/wheelhouse -r requirements.txt -r requirements-build.txt; \
+       else .venv/bin/pip install --no-cache-dir -r requirements.txt -r requirements-build.txt; fi
 ENV PATH=/opt/strata/.venv/bin:/opt/rocm/bin:${PATH}
 ARG HIP_ARCH=gfx1200
 ARG BUILD_JOBS=4
