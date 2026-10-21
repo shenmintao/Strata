@@ -12613,14 +12613,15 @@ int main(int argc, char** argv) {
                     std::string e;
                     try {
                         strata::core::SessionReadLimits limits;
-                        const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib << 20;
+                        // the image is in RAM only until it is restored: half the floor, as for a disk-only write
+                        const uint64_t floor = ((uint64_t) o.conversation_cache_min_free_mib << 20) / 2;
                         limits.admit = [floor](uint64_t need, std::string& why) {
                             const auto mem = strata::core::sample_host_memory();
                             const std::optional<uint64_t> avail =
                                 mem ? std::optional<uint64_t>(mem->available) : std::nullopt;
                             if (strata::core::conversation_memory_admit(avail, need, floor)) return true;
-                            why = "not enough RAM to read it (" + std::to_string(need >> 20) + " MiB plus the floor, " +
-                                  ram_note(mem) + ")";
+                            why = "not enough RAM to read it (" + std::to_string(need >> 20) + " MiB plus a floor of " +
+                                  std::to_string((long long) (floor >> 20)) + " MiB, " + ram_note(mem) + ")";
                             return false;
                         };
                         strata::core::SessionFileIdentity id;
