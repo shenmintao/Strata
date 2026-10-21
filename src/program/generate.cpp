@@ -9384,6 +9384,7 @@ int main(int argc, char** argv) {
             conversations.on_evict = [&](strata::core::SavedConversation&& img) { disk_put(std::move(img), "evicted"); };
         // Save only on a switch/rewind, not on each continuing request. No graph
         // addresses change: all parked images live in ordinary host vectors.
+        int64_t park_keep = 0;   // tokens of the outgoing conversation the next request keeps live (set by the caller)
         auto park_current_body = [&](size_t held) -> bool {
             if (!conversations.enabled() || !live_ok || live.empty()) return true;
             // #2049: parking copies the outgoing conversation's running checkpoints and K/V into host memory, which
@@ -9476,7 +9477,15 @@ int main(int argc, char** argv) {
             // a capped figure would under-evict and overfill the budget.
             bool disk_only = false;   // too large for the RAM budget, long enough for the disk tier
             if (!conversations.make_room(estimate, held)) {
-                if (disk_ok && n_st == 0 && disk.wants((int64_t) live.size())) {
+                if (disk_ok && n_st == 0 && disk.wants((int64_t) live.size()) && park_keep > 0 &&
+                    !disk.wants((int64_t) live.size() - park_keep)) {
+                    // the next request keeps the prefix live; the tail it drops is cheaper to read again than the
+                    // whole conversation is to write (a sibling question over one long document)
+                    std::fprintf(stderr, "strata serve: conversation cache: skip parking (%lld of %zu tokens stay live; the "
+                                         "%lld-token tail is not worth a disk write)\n", (long long) park_keep,
+                                 live.size(), (long long) live.size() - park_keep);
+                    return true;
+                } else if (disk_ok && n_st == 0 && disk.wants((int64_t) live.size())) {
                     disk_only = true;
                     std::fprintf(stderr, "strata serve: conversation cache: snapshot %zu MiB exceeds the RAM budget: to disk\n",
                                  estimate >> 20);
@@ -12707,6 +12716,7 @@ int main(int argc, char** argv) {
             const size_t park_held = o.conversation_cache_park_gain > 0
                                          ? conversations.parked_prefix_tokens(live, live_imgs, checks, cvec_cached)
                                          : 0;
+            park_keep = (!incoming && slot_source < 0 && live_ok) ? std::max<int64_t>(resume, 0) : 0;
             const bool park_worth = o.conversation_cache_park_gain <= 0 || park_held == 0 ||
                                     (int64_t) live.size() >= (int64_t) park_held + o.conversation_cache_park_gain;
             if (borrow && !pin_sibling && park_worth) {
