@@ -9488,7 +9488,8 @@ int main(int argc, char** argv) {
             }
             const auto t0 = Clock::now();
             try {
-                const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024;
+                // a disk-only snapshot is in RAM only while it is written (and freed right after): half the floor
+                const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024 / (disk_only ? 2 : 1);
                 const size_t retained = reuse.bytes() + stage_retained;
                 const size_t additional = estimate > retained ? estimate - retained : 0;
                 // The physical-RAM gate: the incoming snapshot has to fit beside the floor.  make_room()
@@ -9513,7 +9514,7 @@ int main(int argc, char** argv) {
                     ++evicted;
                 if (!admit()) {
                     std::fprintf(stderr, "strata serve: conversation cache: skip parking (physical RAM admission; need %zu MiB plus %lld MiB floor, %s; evicted %zu, %zu still parked)\n",
-                                 additional >> 20, (long long) o.conversation_cache_min_free_mib, ram_note(mem).c_str(),
+                                 additional >> 20, (long long) (floor >> 20), ram_note(mem).c_str(),
                                  evicted, conversations.size());
                     return true;
                 }
@@ -9540,7 +9541,7 @@ int main(int argc, char** argv) {
                 if (!strata::core::conversation_memory_admit(
                         mem_after ? std::optional<uint64_t>(mem_after->available) : std::nullopt, 0, floor)) {
                     std::fprintf(stderr, "strata serve: conversation cache: skip parking (RAM floor after capture: %lld MiB needed, %s)\n",
-                                 (long long) o.conversation_cache_min_free_mib, ram_note(mem_after).c_str());
+                                 (long long) (floor >> 20), ram_note(mem_after).c_str());
                     return true;
                 }
                 const size_t snapshot_bytes = image.bytes();
